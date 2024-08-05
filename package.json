@@ -1,0 +1,17 @@
+{
+    "name": "gss",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+        "process-css": "node gss.js",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "bin": {
+        "gss": "./index.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC"
+}
