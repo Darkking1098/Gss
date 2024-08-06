@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 
-import { log } from "console";
 import fs from "fs";
 import path from "path";
 
 let configs,
     runConfig = { files: {} };
+
+const REGEX = {
+    color: /@col\/([\w-]+)/g,
+};
 
 const base_path = (subPath = null) =>
     path.join(process.cwd(), subPath).replace(/\\/g, "/");
@@ -36,6 +39,11 @@ const writeFile = (file, data) => fs.writeFileSync(file, data, "utf8");
 
 const deleteFile = (file) => fs.unlinkSync(file);
 
+const resolveCol = (color) => {
+    let temp = color.split("-");
+    return `rgba(${configs.colors[temp[0]]},${(temp[1] ?? 100) / 100})`;
+};
+
 class Block {
     constructor(selector, props = [], children = [], extra = {}) {
         this.selector = selector;
@@ -59,9 +67,21 @@ class Block {
             prop = prop.split(":").map((x) => x.trim());
         } else if (prop.includes("-")) {
             prop = prop.split("-").map((x) => x.trim());
-            // For any safety change
         }
-        this.props.push(prop);
+        if (prop[0][0] == "@") {
+            prop[0] = prop[0]
+                .substr(1)
+                .split("-")
+                .map((x) => configs.shorts[x])
+                .join("-");
+        }
+
+        prop[1] = prop[1].replace(REGEX.color, (match, value) =>
+            resolveCol(value)
+        );
+        prop[0].split(",").map((x) => {
+            this.props.push([x, prop[1]]);
+        });
     }
     addChildren(children) {
         this.children = [...this.children, ...children];
@@ -78,8 +98,9 @@ class Block {
 }
 
 const prepareContent = (content) => {
-    if (!Array.isArray(content))
+    if (!Array.isArray(content)) {
         content = content.replace(/\t/g, "    ").split("\n");
+    }
 
     content.filter((x) => x.trim());
 
@@ -99,11 +120,13 @@ const createBlocks = (content) => {
 
     while (content.length >= 0) {
         let line = content.shift();
+        
         const REG = /^( {4}|\t)/;
         if (line) {
             if (line.match(REG)) {
                 let temp = line.trim();
                 if (
+                    temp[0] == "&" ||
                     !temp.match(/[.#@:&]/) ||
                     (temp[0].match(/[.#@:&]/) &&
                         !temp.match(/@([^:\s]+)\s*:\s*([^:\s]+)/))
@@ -120,10 +143,12 @@ const createBlocks = (content) => {
                     block.addProps(line);
                 }
             } else {
-                if (block) blocks.push(block);
-                block = new Block(line);
+                if (line.trim()) {
+                    if (block) blocks.push(block);
+                    block = new Block(line);
+                }
             }
-        } else {
+        } else if(content.length == 0){
             if (block) blocks.push(block);
             block = null;
             break;
@@ -139,6 +164,7 @@ const setColorProp = (color) => {
         b = bigint & 255;
     return `${r},${g},${b}`;
 };
+
 const compileBlock = (block) => {
     if (block.selector == "@def") {
         block.props.forEach(([key, prop]) => {
@@ -147,7 +173,7 @@ const compileBlock = (block) => {
         for (const short in configs.shorts) {
             let val = configs.shorts[short];
             if (!val.includes("@")) continue;
-            let matches = [...val.matchAll(/@([^@-]+)-/g)];
+            let matches = [...val.matchAll(/@(\w+)/g)];
             matches.forEach((match) => {
                 let key = match[1];
                 val = val.replace(`@${key}`, configs.shorts[key]);
@@ -236,7 +262,6 @@ const listFiles = (dirs) => {
 const __main__ = () => {
     readConfig();
     listFiles(configs.dirs);
-    // console.log(runConfig);
 
     for (const file in runConfig.files.updated) {
         compile(file, runConfig.files.updated[file]);
