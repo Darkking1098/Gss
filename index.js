@@ -52,63 +52,60 @@ class Block {
         this.extra = extra;
         this.resolveSelector();
     }
+
     resolveSelector() {
-        let temp = this.selector;
-
-        let [base, extend] = temp.split("++");
-        base = base.split(/(?=@)/).map((s) => s.trim());
-        this.selector = base.shift();
-
-        if (base) base.map((x) => this.addProps(x));
+        let [base, extend] = this.selector.split("++");
+        let baseParts = base.split(/(?=@)/).map((s) => s.trim());
+        this.selector = baseParts.shift();
+        baseParts.forEach(this.addProps.bind(this));
         this.addExtend(extend);
     }
+
     addProps(prop) {
-        if (!Array.isArray(prop) && prop.includes(":")) {
-            prop = prop.split(":").map((x) => x.trim());
-        } else if (prop.includes("-")) {
-            prop = prop.split("-").map((x) => x.trim());
+        if (!Array.isArray(prop)) {
+            prop = prop.includes(":")
+                ? prop.split(":").map((x) => x.trim())
+                : prop.includes("-")
+                ? prop.split("-").map((x) => x.trim())
+                : [prop];
         }
-        if (prop[0][0] == "@") {
+
+        if (prop[0].startsWith("@")) {
             prop[0] = prop[0]
-                .substr(1)
+                .slice(1)
                 .split("-")
                 .map((x) => configs.shorts[x])
                 .join("-");
         }
 
-        prop[1] = prop[1].replace(REGEX.color, (match, value) =>
-            resolveCol(value)
-        );
-        prop[0].split(",").map((x) => {
-            this.props.push([x, prop[1]]);
-        });
+        prop[1] = prop[1].replace(REGEX.color, (_, value) => resolveCol(value));
+        prop[0].split(",").forEach((x) => this.props.push([x.trim(), prop[1]]));
     }
+
     addChildren(children) {
-        this.children = [...this.children, ...children];
+        this.children.push(...children);
     }
+
     addExtend(extend) {
-        if (!Array.isArray(extend))
-            extend = extend?.split(",").map((s) => s.trim()) ?? [];
-        if (this.extra.extend) {
-            this.extra.extend = [...new Set([...this.extra.extend, ...extend])];
-        } else {
-            this.extra.extend = extend;
+        if (!Array.isArray(extend)) {
+            extend = extend ? extend.split(",").map((s) => s.trim()) : [];
         }
+        this.extra.extend = this.extra.extend
+            ? [...new Set([...this.extra.extend, ...extend])]
+            : extend;
     }
 }
 
+
 const prepareContent = (content) => {
-    if (!Array.isArray(content)) {
-        content = content.replace(/\t/g, "    ").split("\n");
-    }
+    content = (
+        Array.isArray(content)
+            ? content
+            : content.replace(/\t/g, "    ").split("\n")
+    ).filter((x) => x.trim());
 
-    content.filter((x) => x.trim());
+    const spaces = content[0]?.match(/^ +/)?.[0].length || 0;
 
-    let spaces = 0;
-
-    if ((spaces = content[0]?.match(/^ +/))) {
-        spaces = spaces[0].length;
-    } else spaces = 0;
     return content.map((x) => x.substr(spaces));
 };
 
@@ -120,7 +117,7 @@ const createBlocks = (content) => {
 
     while (content.length >= 0) {
         let line = content.shift();
-        
+
         const REG = /^( {4}|\t)/;
         if (line) {
             if (line.match(REG)) {
@@ -148,7 +145,7 @@ const createBlocks = (content) => {
                     block = new Block(line);
                 }
             }
-        } else if(content.length == 0){
+        } else if (content.length == 0) {
             if (block) blocks.push(block);
             block = null;
             break;
