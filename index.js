@@ -184,7 +184,9 @@ class Block {
                     .forEach((x) => block.props.push([x.trim(), splitted[1]]));
                 this.children.push(block);
             } else {
-                let block = new Block(findMatch(elem.split('-')[0]));
+                let match = findMatch(elem.split("-")[0]);
+                if (!match) return;
+                let block = new Block(match);
                 let inner = new Block(this.selector);
                 prop[0]
                     .split(",")
@@ -238,7 +240,11 @@ class Block {
         if (selector[0] == "@") {
             return `${selector} { ${children} }`;
         } else {
-            return `${selector} { ${props} } ${children}`;
+            if (props.trim()) {
+                return `${selector} { ${props} } ${children}`;
+            } else {
+                return children;
+            }
         }
     }
 }
